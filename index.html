@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Interactive Bell Curve — Standard Deviation Explorer</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d1b2a;
+      color: #e8e0d0;
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+      gap: 1.5rem;
+    }
+
+    header {
+      text-align: center;
+    }
+
+    h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(1.3rem, 3.5vw, 2rem);
+      color: #f0e8d8;
+      letter-spacing: 0.02em;
+      margin-bottom: 0.3rem;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: #6a8aaa;
+      font-weight: 300;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Stats Dashboard ── */
+    .stats-bar {
+      display: flex;
+      gap: 1.2rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .stat-card {
+      background: #111f30;
+      border: 1px solid #1e3a55;
+      border-radius: 10px;
+      padding: 0.7rem 1.4rem;
+      text-align: center;
+      min-width: 120px;
+      transition: border-color 0.3s;
+    }
+
+    .stat-card.highlight {
+      border-color: #f5a623;
+    }
+
+    .stat-label {
+      font-size: 0.68rem;
+      color: #5a7a99;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 0.25rem;
+    }
+
+    .stat-value {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #f0e8d8;
+      font-variant-numeric: tabular-nums;
+      transition: color 0.3s;
+    }
+
+    .stat-value.amber { color: #f5a623; }
+    .stat-value.teal  { color: #4ecdc4; }
+
+    /* ── Chart ── */
+    .chart-wrapper {
+      background: #111f30;
+      border: 1px solid #1e3048;
+      border-radius: 16px;
+      padding: 1.8rem 2rem 1.4rem;
+      width: 100%;
+      max-width: 740px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    }
+
+    svg#chart {
+      width: 100%;
+      height: auto;
+      overflow: visible;
+      display: block;
+    }
+
+    /* ── Slider Panel ── */
+    .controls {
+      background: #111f30;
+      border: 1px solid #1e3048;
+      border-radius: 14px;
+      padding: 1.4rem 2rem;
+      width: 100%;
+      max-width: 740px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+    }
+
+    .slider-label {
+      font-size: 0.8rem;
+      color: #8aabcc;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      min-width: 80px;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: linear-gradient(to right, #f5a623 var(--pct, 20%), #1e3a55 var(--pct, 20%));
+      outline: none;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #f5a623;
+      border: 3px solid #0d1b2a;
+      box-shadow: 0 0 8px rgba(245,166,35,0.5);
+      cursor: pointer;
+      transition: box-shadow 0.2s;
+    }
+
+    input[type="range"]:hover::-webkit-slider-thumb {
+      box-shadow: 0 0 14px rgba(245,166,35,0.8);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #f5a623;
+      border: 3px solid #0d1b2a;
+      cursor: pointer;
+    }
+
+    .slider-val {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #f5a623;
+      min-width: 36px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* SD descriptor badge */
+    .descriptor {
+      display: flex;
+      justify-content: center;
+    }
+
+    .badge {
+      font-size: 0.78rem;
+      font-weight: 500;
+      padding: 0.3rem 1rem;
+      border-radius: 20px;
+      letter-spacing: 0.06em;
+      transition: background 0.4s, color 0.4s, border-color 0.4s;
+      border: 1px solid;
+    }
+
+    /* ── Empirical Rule Row ── */
+    .rule-row {
+      display: flex;
+      gap: 0.8rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .rule-chip {
+      font-size: 0.75rem;
+      padding: 0.3rem 0.8rem;
+      border-radius: 6px;
+      background: #0d1b2a;
+      border: 1px solid #1e3a55;
+      color: #8aabcc;
+    }
+
+    .rule-chip span {
+      font-weight: 600;
+      color: #f0e8d8;
+    }
+
+    /* ── Footer note ── */
+    .footnote {
+      font-size: 0.72rem;
+      color: #3a5a7a;
+      text-align: center;
+      max-width: 600px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Standard Deviation Explorer</h1>
+    <p class="subtitle">Drag the slider to reshape the distribution — mean is fixed at μ = 50</p>
+  </header>
+
+  <!-- Stats Dashboard -->
+  <div class="stats-bar">
+    <div class="stat-card highlight">
+      <div class="stat-label">Std. Deviation (σ)</div>
+      <div class="stat-value amber" id="disp-sd">5</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Mean (μ)</div>
+      <div class="stat-value">50</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Peak Height</div>
+      <div class="stat-value teal" id="disp-peak">0.0798</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Variance (σ²)</div>
+      <div class="stat-value" id="disp-var">25</div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="chart-wrapper">
+    <svg id="chart" viewBox="0 0 680 300" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="curveFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f5a623" stop-opacity="0.4"/>
+          <stop offset="100%" stop-color="#f5a623" stop-opacity="0.02"/>
+        </linearGradient>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <!-- Grid lines -->
+      <line x1="60" y1="30"  x2="640" y2="30"  stroke="#1a2e42" stroke-width="1"/>
+      <line x1="60" y1="80"  x2="640" y2="80"  stroke="#1a2e42" stroke-width="1"/>
+      <line x1="60" y1="130" x2="640" y2="130" stroke="#1a2e42" stroke-width="1"/>
+      <line x1="60" y1="180" x2="640" y2="180" stroke="#1a2e42" stroke-width="1"/>
+      <line x1="60" y1="230" x2="640" y2="230" stroke="#1a2e42" stroke-width="1"/>
+
+      <!-- Axes -->
+      <line x1="60" y1="255" x2="640" y2="255" stroke="#2e4a66" stroke-width="1.5"/>
+      <line x1="60" y1="20"  x2="60"  y2="255" stroke="#2e4a66" stroke-width="1.5"/>
+
+      <!-- X axis labels -->
+      <text x="60"  y="272" text-anchor="middle" fill="#4a6a88" font-size="10.5" font-family="Inter">20</text>
+      <text x="157" y="272" text-anchor="middle" fill="#4a6a88" font-size="10.5" font-family="Inter">30</text>
+      <text x="254" y="272" text-anchor="middle" fill="#4a6a88" font-size="10.5" font-family="Inter">40</text>
+      <text x="350" y="272" text-anchor="middle" fill="#8aabcc" font-size="11.5" font-family="Inter" font-weight="500">50</text>
+      <text x="446" y="272" text-anchor="middle" fill="#4a6a88" font-size="10.5" font-family="Inter">60</text>
+      <text x="543" y="272" text-anchor="middle" fill="#4a6a88" font-size="10.5" font-family="Inter">70</text>
+      <text x="640" y="272" text-anchor="middle" fill="#4a6a88" font-size="10.5" font-family="Inter">80</text>
+
+      <!-- Axis labels -->
+      <text x="350" y="292" text-anchor="middle" fill="#4a6a88" font-size="10" font-family="Inter" letter-spacing="0.08em">VALUE</text>
+      <text x="16" y="140" text-anchor="middle" fill="#4a6a88" font-size="10" font-family="Inter" letter-spacing="0.06em" transform="rotate(-90,16,140)">DENSITY</text>
+
+      <!-- Mean line -->
+      <line id="mean-line" x1="350" y1="22" x2="350" y2="255"
+            stroke="#8aabcc" stroke-width="1.2" stroke-dasharray="5,4" opacity="0.6"/>
+      <text x="356" y="36" fill="#8aabcc" font-size="10" font-family="Inter">μ = 50</text>
+
+      <!-- Curve fill -->
+      <path id="curve-fill" fill="url(#curveFill)" d=""/>
+
+      <!-- Curve stroke -->
+      <path id="curve-stroke" fill="none" stroke="#f5a623" stroke-width="2.8"
+            stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)" d=""/>
+
+      <!-- Peak label -->
+      <g id="peak-label">
+        <rect id="peak-rect" x="360" y="30" width="130" height="36" rx="6"
+              fill="#1a2e42" stroke="#f5a623" stroke-width="1" stroke-opacity="0.7"/>
+        <text id="peak-text-top" x="368" y="46" fill="#f5a623" font-size="10.5" font-family="Inter" font-weight="500">Peak height</text>
+        <text id="peak-text-val" x="368" y="60" fill="#e8e0d0" font-size="10.5" font-family="Inter">0.0798</text>
+      </g>
+
+      <!-- SD bracket -->
+      <g id="sd-bracket" opacity="0.7">
+        <line id="sd-left"  x1="300" y1="240" x2="300" y2="248" stroke="#4ecdc4" stroke-width="1.5"/>
+        <line id="sd-right" x1="400" y1="240" x2="400" y2="248" stroke="#4ecdc4" stroke-width="1.5"/>
+        <line id="sd-span"  x1="300" y1="244" x2="400" y2="244" stroke="#4ecdc4" stroke-width="1.5"/>
+        <text id="sd-text"  x="350" y="242" text-anchor="middle" fill="#4ecdc4" font-size="9.5" font-family="Inter">σ = 5</text>
+      </g>
+    </svg>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="slider-row">
+      <span class="slider-label">σ (SD)</span>
+      <input type="range" id="sd-slider" min="1" max="20" value="5" step="0.5"/>
+      <span class="slider-val" id="slider-display">5</span>
+    </div>
+    <div class="descriptor">
+      <span class="badge" id="descriptor-badge">Narrow — values tightly clustered</span>
+    </div>
+    <div class="rule-row">
+      <div class="rule-chip">68% within <span id="r1">±5</span> of mean</div>
+      <div class="rule-chip">95% within <span id="r2">±10</span> of mean</div>
+      <div class="rule-chip">99.7% within <span id="r3">±15</span> of mean</div>
+    </div>
+  </div>
+
+  <p class="footnote">
+    The Empirical Rule (68–95–99.7) applies to all normal distributions regardless of σ.
+    As σ increases, the curve flattens and widens — but total area always equals 1.
+  </p>
+
+<script>
+  // ── SVG coordinate system ──
+  // x: value 20→80 maps to px 60→640  (580px / 60 units = 9.667px per unit)
+  // y: density 0→maxDensity maps to px 255→22 (inverted)
+
+  const SVG_X_MIN = 60, SVG_X_MAX = 640;
+  const SVG_Y_TOP = 22, SVG_Y_BOT = 255;
+  const VAL_MIN = 20, VAL_MAX = 80;
+  const MEAN = 50;
+
+  function valToX(v) {
+    return SVG_X_MIN + (v - VAL_MIN) / (VAL_MAX - VAL_MIN) * (SVG_X_MAX - SVG_X_MIN);
+  }
+
+  function densityToY(d, maxD) {
+    // map 0..maxD → SVG_Y_BOT..SVG_Y_TOP
+    const frac = d / maxD;
+    return SVG_Y_BOT - frac * (SVG_Y_BOT - SVG_Y_TOP);
+  }
+
+  function normalPDF(x, mean, sd) {
+    return (1 / (sd * Math.sqrt(2 * Math.PI))) *
+           Math.exp(-0.5 * Math.pow((x - mean) / sd, 2));
+  }
+
+  function buildPath(sd) {
+    const steps = 300;
+    const maxDensity = normalPDF(MEAN, MEAN, sd); // peak
+    const points = [];
+
+    for (let i = 0; i <= steps; i++) {
+      const v = VAL_MIN + (i / steps) * (VAL_MAX - VAL_MIN);
+      const d = normalPDF(v, MEAN, sd);
+      const x = valToX(v);
+      const y = densityToY(d, maxDensity);
+      points.push([x, y]);
+    }
+
+    // Stroke path
+    const stroke = 'M ' + points.map(p => p[0].toFixed(2) + ',' + p[1].toFixed(2)).join(' L ');
+
+    // Fill path (close to baseline)
+    const fill = stroke +
+      ' L ' + points[points.length-1][0].toFixed(2) + ',' + SVG_Y_BOT +
+      ' L ' + points[0][0].toFixed(2) + ',' + SVG_Y_BOT + ' Z';
+
+    return { stroke, fill, maxDensity, points };
+  }
+
+  function getDescriptor(sd) {
+    if (sd <= 3)  return { text: 'Very narrow — extremely tight clustering', bg: '#2a1a00', color: '#f5a623', border: '#f5a623' };
+    if (sd <= 6)  return { text: 'Narrow — values tightly clustered', bg: '#1f2a10', color: '#a8d060', border: '#a8d060' };
+    if (sd <= 10) return { text: 'Moderate spread — typical distribution', bg: '#0f2a2a', color: '#4ecdc4', border: '#4ecdc4' };
+    if (sd <= 15) return { text: 'Wide — values spread broadly', bg: '#0f1a2a', color: '#6aabee', border: '#6aabee' };
+    return { text: 'Very wide — highly dispersed values', bg: '#1a0f2a', color: '#b06aee', border: '#b06aee' };
+  }
+
+  function update(sd) {
+    const { stroke, fill, maxDensity, points } = buildPath(sd);
+
+    document.getElementById('curve-stroke').setAttribute('d', stroke);
+    document.getElementById('curve-fill').setAttribute('d', fill);
+
+    // Peak label position — place near top of curve
+    const peakX = valToX(MEAN);
+    const peakY = densityToY(maxDensity, maxDensity); // = SVG_Y_TOP
+    const rectX = peakX + 10;
+    const rectY = peakY + 8;
+    document.getElementById('peak-rect').setAttribute('x', rectX);
+    document.getElementById('peak-rect').setAttribute('y', rectY);
+    document.getElementById('peak-text-top').setAttribute('x', rectX + 8);
+    document.getElementById('peak-text-top').setAttribute('y', rectY + 16);
+    document.getElementById('peak-text-val').setAttribute('x', rectX + 8);
+    document.getElementById('peak-text-val').setAttribute('y', rectY + 30);
+    document.getElementById('peak-text-val').textContent = maxDensity.toFixed(4);
+
+    // SD bracket — draw at 1σ from mean
+    const sdPx = (sd / (VAL_MAX - VAL_MIN)) * (SVG_X_MAX - SVG_X_MIN);
+    const leftX  = valToX(MEAN - sd);
+    const rightX = valToX(MEAN + sd);
+    const bracketY = SVG_Y_BOT - 12;
+    document.getElementById('sd-left').setAttribute('x1', leftX);
+    document.getElementById('sd-left').setAttribute('x2', leftX);
+    document.getElementById('sd-left').setAttribute('y1', bracketY - 4);
+    document.getElementById('sd-left').setAttribute('y2', bracketY + 4);
+    document.getElementById('sd-right').setAttribute('x1', rightX);
+    document.getElementById('sd-right').setAttribute('x2', rightX);
+    document.getElementById('sd-right').setAttribute('y1', bracketY - 4);
+    document.getElementById('sd-right').setAttribute('y2', bracketY + 4);
+    document.getElementById('sd-span').setAttribute('x1', leftX);
+    document.getElementById('sd-span').setAttribute('x2', rightX);
+    document.getElementById('sd-span').setAttribute('y1', bracketY);
+    document.getElementById('sd-span').setAttribute('y2', bracketY);
+    document.getElementById('sd-text').setAttribute('x', valToX(MEAN));
+    document.getElementById('sd-text').setAttribute('y', bracketY - 4);
+    document.getElementById('sd-text').textContent = 'σ = ' + sd;
+
+    // Stats dashboard
+    document.getElementById('disp-sd').textContent   = sd;
+    document.getElementById('disp-peak').textContent = maxDensity.toFixed(4);
+    document.getElementById('disp-var').textContent  = (sd * sd).toFixed(1);
+    document.getElementById('slider-display').textContent = sd;
+
+    // Empirical rule chips
+    document.getElementById('r1').textContent = '±' + sd;
+    document.getElementById('r2').textContent = '±' + (sd * 2);
+    document.getElementById('r3').textContent = '±' + (sd * 3);
+
+    // Descriptor badge
+    const desc = getDescriptor(sd);
+    const badge = document.getElementById('descriptor-badge');
+    badge.textContent = desc.text;
+    badge.style.background    = desc.bg;
+    badge.style.color         = desc.color;
+    badge.style.borderColor   = desc.border;
+
+    // Slider gradient
+    const slider = document.getElementById('sd-slider');
+    const pct = ((sd - 1) / 19 * 100).toFixed(1);
+    slider.style.setProperty('--pct', pct + '%');
+    slider.style.background = `linear-gradient(to right, ${desc.color} ${pct}%, #1e3a55 ${pct}%)`;
+    // Update thumb color via CSS variable trick — use a style tag
+    document.getElementById('thumb-style').textContent =
+      `input[type="range"]::-webkit-slider-thumb { background: ${desc.color} !important; box-shadow: 0 0 10px ${desc.color}88 !important; }
+       input[type="range"]::-moz-range-thumb { background: ${desc.color} !important; }`;
+
+    document.getElementById('disp-sd').style.color = desc.color;
+  }
+
+  // Dynamic thumb style tag
+  const thumbStyle = document.createElement('style');
+  thumbStyle.id = 'thumb-style';
+  document.head.appendChild(thumbStyle);
+
+  const slider = document.getElementById('sd-slider');
+  slider.addEventListener('input', () => update(parseFloat(slider.value)));
+
+  // Init
+  update(5);
+</script>
+</body>
+</html>
